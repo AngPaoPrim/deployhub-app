@@ -7,7 +7,7 @@ const path = require("path");
 const simpleGit = require("simple-git");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // ดึงค่าจาก environment variables เท่านั้น
 const CLIENT_ID = process.env.CLIENT_ID;
