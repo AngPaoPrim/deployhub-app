@@ -1,0 +1,23 @@
+{
+  "name": "deployhub-app",
+  "version": "1.0.0",
+  "description": "A Node.js application for deploying files to GitHub Pages",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+
+  "dependencies": {
+    "axios": "^1.9.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "express-fileupload": "^1.5.1",
+    "simple-git": "^3.27.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [],
+  "author": "Your Name",
+  "license": "MIT"
+}

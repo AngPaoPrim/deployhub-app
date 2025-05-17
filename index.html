@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
+  <meta charset="UTF-8" />
+  <title>DeployHub</title>
+</head>
+<body>
+  <header>
+    <h1 data-aos="fade-down">DeployHub</h1>
+  </header>
+  <main>
+    <div id="content" data-aos="fade-up">
+      <p>กำลังโหลด...</p>
+    </div>
+  </main>
+  <footer>
+    <p>© 2025 DeployHub. All rights reserved.</p>
+  </footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+  <script>
+    const BACKEND_URL = "https://backend-f0ep.onrender.com";
+    AOS.init();
+
+    fetch("/me")
+      .then(res => res.json())
+      .then(data => {
+        if (data.login) {
+          document.getElementById("content").innerHTML = `
+            <p>ยินดีต้อนรับ ${data.login}</p>
+            <input type="file" webkitdirectory directory multiple id="folder" />
+            <button onclick="upload()">อัปโหลดโฟลเดอร์</button>
+            <p id="status"></p>
+            <p><a href="/logout">ออกจากระบบ</a></p>
+          `;
+        } else {
+          document.getElementById("content").innerHTML = `<a href="/login"><button>เข้าสู่ระบบด้วย GitHub</button></a>`;
+        }
+      });
+
+    async function upload() {
+      const folderInput = document.getElementById("folder");
+      const files = folderInput.files;
+      const statusElement = document.getElementById("status");
+
+      if (files.length === 0) return alert("กรุณาเลือกโฟลเดอร์");
+
+      statusElement.innerHTML = "📤 กำลังอัปโหลดไฟล์...";
+      const formData = new FormData();
+      for (let file of files) {
+        formData.append("files", file, file.webkitRelativePath);
+      }
+
+      try {
+        const res = await fetch("/upload", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (data.url) {
+          statusElement.innerHTML = `✅ เปิดเว็บ: <a href="${data.url}" target="_blank">${data.url}</a>`;
+        } else {
+          statusElement.innerHTML = "❌ ล้มเหลวในการอัปโหลดไฟล์";
+        }
+      } catch (error) {
+        statusElement.innerHTML = "❌ เกิดข้อผิดพลาดระหว่างการอัปโหลด";
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>
