@@ -19,7 +19,7 @@ app.use(express.static(__dirname));
 
 // GitHub Login
 app.get("/login", (req, res) => {
-  const redirect_uri = `http://localhost:${PORT}/callback`;
+  const redirect_uri = `${req.protocol}://${req.get("host")}/callback`;
   res.redirect(
     `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirect_uri}&scope=repo`
   );
