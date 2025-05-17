@@ -4,30 +4,32 @@ const cookieParser = require("cookie-parser");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const simpleGit = require("simple-git");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// GitHub OAuth Credentials
-const CLIENT_ID = "Ov23limMaL5Q5do2eAa3";
-const CLIENT_SECRET = "46bb29cbc40c5c0d33d190d2bb2a1788d7b7ffb7";
+// ดึงค่าจาก environment variables เท่านั้น
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI || `http://localhost:${PORT}/callback`;
 
 app.use(cookieParser());
 app.use(fileUpload());
 app.use(express.static(__dirname));
 
-
 // GitHub Login
 app.get("/login", (req, res) => {
-  const redirect_uri = `${req.protocol}://${req.get("host")}/callback`;
-  res.redirect(
-    `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${redirect_uri}&scope=repo`
-  );
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=repo`;
+  res.redirect(githubAuthUrl);
 });
 
 // GitHub OAuth Callback
 app.get("/callback", async (req, res) => {
   const code = req.query.code;
+  if (!code) {
+    return res.status(400).send("No code provided");
+  }
   try {
     const tokenRes = await axios.post(
       "https://github.com/login/oauth/access_token",
@@ -35,14 +37,18 @@ app.get("/callback", async (req, res) => {
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
         code,
+        redirect_uri: REDIRECT_URI,
       },
       { headers: { Accept: "application/json" } }
     );
     const token = tokenRes.data.access_token;
-    res.cookie("token", token);
+    if (!token) {
+      return res.status(400).send("Failed to get access token");
+    }
+    res.cookie("token", token, { httpOnly: true });
     res.redirect("/");
   } catch (error) {
-    console.error("Error during GitHub OAuth:", error);
+    console.error("Error during GitHub OAuth:", error.response?.data || error.message);
     res.status(500).send("Authentication failed");
   }
 });
@@ -57,7 +63,7 @@ app.get("/me", async (req, res) => {
     });
     res.json({ login: userRes.data.login });
   } catch (error) {
-    console.error("Error fetching user info:", error);
+    console.error("Error fetching user info:", error.response?.data || error.message);
     res.json({});
   }
 });
@@ -106,26 +112,14 @@ app.post("/upload", async (req, res) => {
     }
 
     // Push files to GitHub
-    const simpleGit = require("simple-git");
     const git = simpleGit(repoPath);
 
     await git.init();
-    console.log("Git repository initialized");
-
     await git.checkoutLocalBranch("main");
-    console.log("Branch 'main' created");
-
     await git.addRemote("origin", repoRes.data.clone_url);
-    console.log("Remote added:", repoRes.data.clone_url);
-
     await git.add(".");
-    console.log("Files added to Git");
-
     await git.commit("Initial commit");
-    console.log("Commit created");
-
     await git.push("origin", "main");
-    console.log("Files pushed to GitHub");
 
     // Enable GitHub Pages
     await axios.post(
@@ -137,7 +131,7 @@ app.post("/upload", async (req, res) => {
     const pagesUrl = `https://${repoRes.data.owner.login}.github.io/${repoName}/`;
     res.json({ url: pagesUrl });
   } catch (error) {
-    console.error("Error during file upload:", error);
+    console.error("Error during file upload:", error.response?.data || error.message);
     res.status(500).send("Failed to upload files");
   } finally {
     // Clean up local files
@@ -148,7 +142,7 @@ app.post("/upload", async (req, res) => {
       } catch (err) {
         console.error("Error cleaning up temporary files:", err);
       }
-    }, 1000); // Delay cleanup to avoid EBUSY error
+    }, 1000);
   }
 });
 
@@ -161,4 +155,5 @@ app.get("/logout", (req, res) => {
 // Start the server
 app.listen(PORT, () => {
   console.log(`✅ DeployHub พร้อมใช้งาน: http://localhost:${PORT}`);
+  console.log(`✅ Redirect URI: ${REDIRECT_URI}`);
 });
