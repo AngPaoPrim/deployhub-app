@@ -82,44 +82,47 @@ app.post("/upload", async (req, res) => {
   const repoPath = path.join(__dirname, repoName);
 
   try {
+    // สร้าง repo ใหม่บน GitHub
     const repoRes = await axios.post(
       "https://api.github.com/user/repos",
       { name: repoName },
       { headers: { Authorization: `token ${token}` } }
     );
 
+    // สร้าง folder ชั่วคราว
     fs.mkdirSync(repoPath, { recursive: true });
+
+    // ย้ายไฟล์ที่อัพโหลดมาไว้ในโฟลเดอร์ชั่วคราว
     if (Array.isArray(files)) {
       for (const file of files) {
         const filePath = path.join(repoPath, file.name);
         await new Promise((resolve, reject) => {
-          file.mv(filePath, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
+          file.mv(filePath, (err) => (err ? reject(err) : resolve()));
         });
       }
     } else {
       const filePath = path.join(repoPath, files.name);
       await new Promise((resolve, reject) => {
-        files.mv(filePath, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+        files.mv(filePath, (err) => (err ? reject(err) : resolve()));
       });
     }
 
     const git = simpleGit(repoPath);
 
     await git.init();
-    await git.addConfig("user.email", "deployhub@app.com"); // ✅ เพิ่มส่วนนี้
-    await git.addConfig("user.name", "DeployHub Bot");       // ✅ เพิ่มส่วนนี้
+    await git.addConfig("user.email", "deployhub@app.com");
+    await git.addConfig("user.name", "DeployHub Bot");
     await git.checkoutLocalBranch("main");
-    await git.addRemote("origin", repoRes.data.clone_url);
+
+    // แก้ตรงนี้ เพิ่ม token ใน URL เพื่อ push ผ่าน HTTPS ได้
+    const authUrl = `https://${token}:x-oauth-basic@github.com/${repoRes.data.owner.login}/${repoName}.git`;
+    await git.addRemote("origin", authUrl);
+
     await git.add(".");
     await git.commit("Initial commit");
     await git.push("origin", "main");
 
+    // เปิด GitHub Pages จาก repo นี้
     await axios.post(
       `https://api.github.com/repos/${repoRes.data.owner.login}/${repoName}/pages`,
       { source: { branch: "main", path: "/" } },
@@ -132,6 +135,7 @@ app.post("/upload", async (req, res) => {
     console.error("Error during file upload:", error.response?.data || error.message);
     res.status(500).json({ error: "Failed to upload files" });
   } finally {
+    // ลบไฟล์ชั่วคราวทิ้งหลัง 1 วินาที
     setTimeout(() => {
       try {
         fs.rmSync(repoPath, { recursive: true, force: true });
